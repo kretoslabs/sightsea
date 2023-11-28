@@ -279,5 +279,17 @@ contract SightseaV3 is Ownable {
         );
         // only transfer point not transfer and expire
         // when transfer point => update isTranfer = true
+        for (uint256 i = 0; i < amount; i++) {
+            // update
+            pointsOfUser[from][i].isTranfer = true;
+            pointsOfUser[from][i].owner = to;
+            pointsOfUser[from][i].expire = 0;
+
+            pointsOfUser[to].push(pointsOfUser[from][i]);
+            pointsOfUser[from][i] = pointsOfUser[from][
+                pointsOfUser[from].length - 1
+            ];
+            pointsOfUser[from].pop();
+        }
     }
 }
