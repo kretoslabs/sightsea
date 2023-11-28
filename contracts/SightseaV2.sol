@@ -1,11 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.8.2 <0.9.0;
 import "./Ownable.sol";
+import "./Point.sol";
 
-contract SightseeV1 is Ownable {
+contract SightseaV2 is Ownable {
     address public protocolFeeDestination;
     uint256 public protocolFeePercent;
     uint256 public subjectFeePercent;
+
+    Point _point;
+
+    constructor() payable {
+        _point = new Point(0);
+    }
 
     event Trade(
         address trader,
@@ -24,9 +31,6 @@ contract SightseeV1 is Ownable {
     // SharesSubject => Supply
     mapping(address => uint256) public sharesSupply;
 
-    // Address => Reputation
-    mapping(address => uint256) public reputation;
-
     uint256 public totalSubjects;
     address[] public allSubjects;
 
@@ -34,7 +38,10 @@ contract SightseeV1 is Ownable {
     mapping(address => bool) public isSubject;
 
     // Address => Keys of user
-    mapping(address => address[]) public keysOfUser;
+    mapping(address => address[]) internal _keysOfUser;
+
+    // Address => Point[]
+    mapping(address => Point[]) internal _pointsOfUser;
 
     function setFeeDestination(address _feeDestination) public onlyOwner {
         protocolFeeDestination = _feeDestination;
@@ -123,14 +130,14 @@ contract SightseeV1 is Ownable {
         }
 
         bool hasKey = false;
-        for (uint256 i = 0; i < keysOfUser[msg.sender].length; i++) {
-            if (keysOfUser[msg.sender][i] == sharesSubject) {
+        for (uint256 i = 0; i < _keysOfUser[msg.sender].length; i++) {
+            if (_keysOfUser[msg.sender][i] == sharesSubject) {
                 hasKey = true;
                 break;
             }
         }
         if (!hasKey) {
-            keysOfUser[msg.sender].push(sharesSubject);
+            _keysOfUser[msg.sender].push(sharesSubject);
         }
         emit Trade(
             msg.sender,
@@ -185,39 +192,23 @@ contract SightseeV1 is Ownable {
         require(success1 && success2 && success3, "Unable to send funds");
     }
 
-    function checkKeyIsSubject(address key) public view returns (bool) {
-        return isSubject[key];
-    }
-
-    function setReputation(address user, uint256 amount) public {
-        reputation[user] = amount;
-    }
-
-    function getReputation(address user) public view returns (uint256) {
-        return reputation[user];
-    }
-
-    function tranferReputation(
-        address from,
-        address to,
-        uint256 amount
-    ) public {
-        require(
-            reputation[from] >= amount,
-            "Insufficient reputation to transfer"
-        );
-        reputation[from] = reputation[from] - amount;
-        reputation[to] = reputation[to] + amount;
-    }
-
     function getAllKeysOfUser(
         address user
     ) public view returns (address[] memory) {
-        return keysOfUser[user];
+        return _keysOfUser[user];
     }
 
-    function getTotalSubjects() public view returns (uint256) {
-        return totalSubjects;
+    function getTotalBalanceOfUser(address user) public view returns (uint256) {
+        uint256 total = 0;
+        for (uint256 i = 0; i < _keysOfUser[user].length; i++) {
+            total =
+                total +
+                getSellPrice(
+                    _keysOfUser[user][i],
+                    sharesBalance[_keysOfUser[user][i]][user]
+                );
+        }
+        return total;
     }
 
     function getAllKeyInMarket() public view returns (address[] memory) {
@@ -230,5 +221,29 @@ contract SightseeV1 is Ownable {
             }
         }
         return keys;
+    }
+
+    function mintTo(address to, uint256 amount) public {
+        _point.mint(to, amount);
+    }
+
+    function getPointBalance(address user) public view returns (uint256) {
+        return _point.balanceOf(user);
+    }
+
+    function getTotalSupply() public view returns (uint256) {
+        return _point.totalSupply();
+    }
+
+    function tranferPoint(address from, address to, uint256 value) public {
+        _point.transferFrom(from, to, value);
+    }
+
+    function burnPoint(address from, uint256 value) public {
+        _point.burnPoint(from, value);
+    }
+
+    function getTotalPoint() public view returns (uint256) {
+        return _point.totalSupply();
     }
 }
