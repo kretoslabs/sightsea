@@ -234,7 +234,8 @@ contract SightseaV3 is Ownable {
 
     function removePointExpired() public onlyOwner {
         for (uint256 i = 0; i < _points.length; i++) {
-            if (_points[i].expire < block.timestamp) {
+            // only remove point when isTranfer = false and expire < block.timestamp
+            if (!_points[i].isTranfer && _points[i].expire < block.timestamp) {
                 _points[i] = _points[_points.length - 1];
                 _points.pop();
             }
@@ -243,7 +244,11 @@ contract SightseaV3 is Ownable {
 
     function removePointOfUserExpired(address user) public onlyOwner {
         for (uint256 i = 0; i < pointsOfUser[user].length; i++) {
-            if (pointsOfUser[user][i].expire < block.timestamp) {
+            // only remove point of user when isTranfer = false and expire < block.timestamp
+            if (
+                !pointsOfUser[user][i].isTranfer &&
+                pointsOfUser[user][i].expire < block.timestamp
+            ) {
                 pointsOfUser[user][i] = pointsOfUser[user][
                     pointsOfUser[user].length - 1
                 ];
@@ -252,12 +257,7 @@ contract SightseaV3 is Ownable {
         }
     }
 
-    function randomPointForUser(address user, uint256 amount) public {
-        // random
-        // => fail
-        // => success
-        // add to pointsOfUser
-        // remove from _points
+    function randomPointForUser(address user, uint256 amount) public payable {
         require(_points.length >= amount, "The number of points is not enough");
         for (uint256 i = 0; i < amount; i++) {
             pointsOfUser[user].push(_points[i]);
@@ -272,24 +272,39 @@ contract SightseaV3 is Ownable {
         return pointsOfUser[user];
     }
 
-    function tranferPoint(address from, address to, uint256 amount) public {
-        require(
-            pointsOfUser[from].length >= amount,
-            "The user does not have any point"
-        );
-        // only transfer point not transfer and expire
-        // when transfer point => update isTranfer = true
-        for (uint256 i = 0; i < amount; i++) {
-            // update
-            pointsOfUser[from][i].isTranfer = true;
-            pointsOfUser[from][i].owner = to;
-            pointsOfUser[from][i].expire = 0;
+    function getTotalPointOfUser(address user) public view returns (uint256) {
+        return pointsOfUser[user].length;
+    }
 
-            pointsOfUser[to].push(pointsOfUser[from][i]);
-            pointsOfUser[from][i] = pointsOfUser[from][
-                pointsOfUser[from].length - 1
-            ];
-            pointsOfUser[from].pop();
+    function tranferPoint(address from, address to, uint256 amount) public {
+        uint256 pointCanTransfer = 0;
+        for (uint256 i = 0; i < pointsOfUser[from].length; i++) {
+            if (!pointsOfUser[from][i].isTranfer) {
+                pointCanTransfer = pointCanTransfer + 1;
+            }
         }
+
+        require(pointCanTransfer >= amount, "The user does not enough points");
+
+        uint256 count = 0;
+        for (uint256 i = 0; i < pointsOfUser[from].length; i++) {
+            if (!pointsOfUser[from][i].isTranfer) {
+                count = count + 1;
+                pointsOfUser[from][i].isTranfer = true;
+                pointsOfUser[from][i].owner = to;
+                pointsOfUser[to].push(pointsOfUser[from][i]);
+                pointsOfUser[from][i] = pointsOfUser[from][
+                    pointsOfUser[from].length - 1
+                ];
+                pointsOfUser[from].pop();
+            }
+            if (count == amount) {
+                break;
+            }
+        }
+    }
+
+    function getPointApplication() public view returns (uint256) {
+        return _points.length;
     }
 }
