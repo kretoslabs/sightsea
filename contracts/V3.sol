@@ -200,6 +200,15 @@ contract SightseaV3 is Ownable {
         return _keysOfUser[user];
     }
 
+    function getTotalKeyOfUser(address user) public view returns (uint256) {
+        uint256 total = 0;
+        for (uint256 i = 0; i < _keysOfUser[user].length; i++) {
+            total = total + sharesBalance[_keysOfUser[user][i]][user];
+        }
+
+        return total;
+    }
+
     function getTotalBalanceOfUser(address user) public view returns (uint256) {
         uint256 total = 0;
         for (uint256 i = 0; i < _keysOfUser[user].length; i++) {
@@ -223,6 +232,14 @@ contract SightseaV3 is Ownable {
             }
         }
         return keys;
+    }
+
+    function getTotalKeyInMarket() public view returns (uint256) {
+        uint256 total = 0;
+        for (uint256 i = 0; i < allSubjects.length; i++) {
+            total = total + sharesSupply[allSubjects[i]];
+        }
+        return total;
     }
 
     function createPoint(uint256 amount, uint256 expire) public onlyOwner {
@@ -257,8 +274,46 @@ contract SightseaV3 is Ownable {
         }
     }
 
+    function getPercenRandom(address user) public view returns (uint256) {
+        uint256 totalKey = getTotalKeyInMarket();
+        uint256 totalKeyOfUser = getTotalKeyOfUser(user);
+
+        // calculate percent of user => 1 - 1000
+        uint256 percent = (totalKeyOfUser * 1000) / totalKey;
+
+        return percent;
+    }
+
     function randomPointForUser(address user, uint256 amount) public payable {
         require(_points.length >= amount, "The number of points is not enough");
+        // check user random point in week
+        // if user random point in week, checkIsRandom = true
+        bool checkIsRandom = false;
+        for (uint256 i = 0; i < pointsOfUser[user].length; i++) {
+            if (
+                pointsOfUser[user][i].expire >
+                block.timestamp - (1 weeks - 1 days)
+            ) {
+                checkIsRandom = true;
+                break;
+            }
+        }
+
+        require(!checkIsRandom, "The user has random point in week");
+
+        // logic random point
+        uint256 percent = getPercenRandom(user);
+
+        // random a number from 0 to 1000
+        uint256 randomNumber = uint256(
+            keccak256(abi.encodePacked(block.timestamp, msg.sender, percent))
+        ) % 1000;
+
+        // check random number in range of percent
+        if (randomNumber > percent) {
+            revert("Good luck next time");
+        }
+
         for (uint256 i = 0; i < amount; i++) {
             pointsOfUser[user].push(_points[i]);
             _points[i] = _points[_points.length - 1];
