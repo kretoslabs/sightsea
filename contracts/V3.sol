@@ -250,12 +250,8 @@ contract SightseaV3 is Ownable {
     }
 
     function removePointExpired() public onlyOwner {
-        for (uint256 i = 0; i < _points.length; i++) {
-            // only remove point when isTranfer = false and expire < block.timestamp
-            if (!_points[i].isTranfer && _points[i].expire < block.timestamp) {
-                _points[i] = _points[_points.length - 1];
-                _points.pop();
-            }
+        for (uint256 i = _points.length; i > 0; i--) {
+            _points.pop();
         }
     }
 
@@ -347,6 +343,7 @@ contract SightseaV3 is Ownable {
                 count = count + 1;
                 pointsOfUser[from][i].isTranfer = true;
                 pointsOfUser[from][i].owner = to;
+
                 pointsOfUser[to].push(pointsOfUser[from][i]);
                 pointsOfUser[from][i] = pointsOfUser[from][
                     pointsOfUser[from].length - 1
