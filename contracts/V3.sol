@@ -7,8 +7,6 @@ contract SightseaV3 is Ownable {
     uint256 public protocolFeePercent;
     uint256 public subjectFeePercent;
 
-    constructor() payable {}
-
     struct Point {
         address owner;
         uint256 expire;
