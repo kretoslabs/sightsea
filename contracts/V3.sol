@@ -2,7 +2,7 @@
 pragma solidity >=0.8.2 <0.9.0;
 import "./Ownable.sol";
 
-contract SightseaV3 is Ownable {
+contract SightseaV1 is Ownable {
     address public protocolFeeDestination;
     uint256 public protocolFeePercent;
     uint256 public subjectFeePercent;
