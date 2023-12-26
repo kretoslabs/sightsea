@@ -192,6 +192,10 @@ contract SightseaV1 is Ownable {
         return _keysOfUser[user];
     }
 
+    function getAllKeyInMarket() public view returns (address[] memory) {
+        return allSubjects;
+    }
+
     function setMeritPointSupply(uint256 amount) public onlyOwner {
         meritPointSupply = amount;
     }
