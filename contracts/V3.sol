@@ -7,12 +7,6 @@ contract SightseaV3 is Ownable {
     uint256 public protocolFeePercent;
     uint256 public subjectFeePercent;
 
-    struct Point {
-        address owner;
-        uint256 expire;
-        bool isTranfer;
-    }
-
     event Trade(
         address trader,
         address subject,
@@ -39,9 +33,9 @@ contract SightseaV3 is Ownable {
     // Address => Keys of user
     mapping(address => address[]) internal _keysOfUser;
 
-    // Address => Point[]
-    Point[] internal _points;
-    mapping(address => Point[]) internal pointsOfUser;
+    uint256 meritPointSupply = 0;
+    mapping(address => uint256) public meritPoint;
+    mapping(address => uint256) public gmeritPoint;
 
     function setFeeDestination(address _feeDestination) public onlyOwner {
         protocolFeeDestination = _feeDestination;
@@ -198,163 +192,39 @@ contract SightseaV3 is Ownable {
         return _keysOfUser[user];
     }
 
-    function getTotalKeyOfUser(address user) public view returns (uint256) {
-        uint256 total = 0;
-        for (uint256 i = 0; i < _keysOfUser[user].length; i++) {
-            total = total + sharesBalance[_keysOfUser[user][i]][user];
-        }
-
-        return total;
+    function setMeritPointSupply(uint256 amount) public onlyOwner {
+        meritPointSupply = amount;
     }
 
-    function getTotalBalanceOfUser(address user) public view returns (uint256) {
-        uint256 total = 0;
-        for (uint256 i = 0; i < _keysOfUser[user].length; i++) {
-            total =
-                total +
-                getSellPrice(
-                    _keysOfUser[user][i],
-                    sharesBalance[_keysOfUser[user][i]][user]
-                );
-        }
-        return total;
+    function getMeritPointSupply() public view returns (uint256) {
+        return meritPointSupply;
     }
 
-    function getAllKeyInMarket() public view returns (address[] memory) {
-        address[] memory keys = new address[](totalSubjects);
-        uint256 index = 0;
-        for (uint256 i = 0; i < allSubjects.length; i++) {
-            if (isSubject[allSubjects[i]]) {
-                keys[index] = allSubjects[i];
-                index = index + 1;
-            }
-        }
-        return keys;
+    function addMeritPoint(address user, uint256 amount) public onlyOwner {
+        meritPoint[user] = meritPoint[user] + amount;
     }
 
-    function getTotalKeyInMarket() public view returns (uint256) {
-        uint256 total = 0;
-        for (uint256 i = 0; i < allSubjects.length; i++) {
-            total = total + sharesSupply[allSubjects[i]];
-        }
-        return total;
+    function addGMeritPoint(address user, uint256 amount) public onlyOwner {
+        require(meritPointSupply >= amount, "Insufficient merit point supply");
+        meritPointSupply = meritPointSupply - amount;
+        gmeritPoint[user] = gmeritPoint[user] + amount;
     }
 
-    function createPoint(uint256 amount, uint256 expire) public onlyOwner {
-        Point memory point = Point(_msgSender(), expire, false);
-        for (uint256 i = 0; i < amount; i++) {
-            _points.push(point);
-        }
+    function tranferMeritPoint(
+        address from,
+        address to,
+        uint256 amount
+    ) public {
+        require(gmeritPoint[from] >= amount, "Insufficient gmerit point");
+        gmeritPoint[from] = gmeritPoint[from] - amount;
+        meritPoint[to] = meritPoint[to] + amount;
     }
 
-    function removePointExpired() public onlyOwner {
-        for (uint256 i = _points.length; i > 0; i--) {
-            _points.pop();
-        }
+    function resetMeritPointSupply() public onlyOwner {
+        meritPointSupply = 0;
     }
 
-    function removePointOfUserExpired(address user) public onlyOwner {
-        for (uint256 i = 0; i < pointsOfUser[user].length; i++) {
-            // only remove point of user when isTranfer = false and expire < block.timestamp
-            if (
-                !pointsOfUser[user][i].isTranfer &&
-                pointsOfUser[user][i].expire < block.timestamp
-            ) {
-                pointsOfUser[user][i] = pointsOfUser[user][
-                    pointsOfUser[user].length - 1
-                ];
-                pointsOfUser[user].pop();
-            }
-        }
-    }
-
-    function getPercenRandom(address user) public view returns (uint256) {
-        uint256 totalKey = getTotalKeyInMarket();
-        uint256 totalKeyOfUser = getTotalKeyOfUser(user);
-
-        // calculate percent of user => 1 - 1000
-        uint256 percent = (totalKeyOfUser * 1000) / totalKey;
-
-        return percent;
-    }
-
-    function randomPointForUser(address user, uint256 amount) public payable {
-        require(_points.length >= amount, "The number of points is not enough");
-        // check user random point in week
-        // if user random point in week, checkIsRandom = true
-        bool checkIsRandom = false;
-        for (uint256 i = 0; i < pointsOfUser[user].length; i++) {
-            if (
-                pointsOfUser[user][i].expire >
-                block.timestamp - (1 weeks - 1 days)
-            ) {
-                checkIsRandom = true;
-                break;
-            }
-        }
-
-        require(!checkIsRandom, "The user has random point in week");
-
-        // logic random point
-        uint256 percent = getPercenRandom(user);
-
-        // random a number from 0 to 1000
-        uint256 randomNumber = uint256(
-            keccak256(abi.encodePacked(block.timestamp, msg.sender, percent))
-        ) % 1000;
-
-        // check random number in range of percent
-        if (randomNumber > percent) {
-            revert("Good luck next time");
-        }
-
-        for (uint256 i = 0; i < amount; i++) {
-            pointsOfUser[user].push(_points[i]);
-            _points[i] = _points[_points.length - 1];
-            _points.pop();
-        }
-    }
-
-    function getPointsOfUser(
-        address user
-    ) public view returns (Point[] memory) {
-        return pointsOfUser[user];
-    }
-
-    function getTotalPointOfUser(address user) public view returns (uint256) {
-        return pointsOfUser[user].length;
-    }
-
-    function tranferPoint(address from, address to, uint256 amount) public {
-        uint256 pointCanTransfer = 0;
-        for (uint256 i = 0; i < pointsOfUser[from].length; i++) {
-            if (!pointsOfUser[from][i].isTranfer) {
-                pointCanTransfer = pointCanTransfer + 1;
-            }
-        }
-
-        require(pointCanTransfer >= amount, "The user does not enough points");
-
-        uint256 count = 0;
-        for (uint256 i = 0; i < pointsOfUser[from].length; i++) {
-            if (!pointsOfUser[from][i].isTranfer) {
-                count = count + 1;
-                pointsOfUser[from][i].isTranfer = true;
-                pointsOfUser[from][i].owner = to;
-
-                pointsOfUser[to].push(pointsOfUser[from][i]);
-                pointsOfUser[from][i] = pointsOfUser[from][
-                    pointsOfUser[from].length - 1
-                ];
-                pointsOfUser[from].pop();
-            }
-            if (count == amount) {
-                break;
-            }
-        }
-    }
-
-    function getPointApplication() public view returns (uint256) {
-        return _points.length;
+    function resetGMeritPointOfUser(address user) public onlyOwner {
+        gmeritPoint[user] = 0;
     }
 }

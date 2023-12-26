@@ -1,18 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.8.2 <0.9.0;
 import "./Ownable.sol";
-import "./Point.sol";
 
-contract SightseaV2 is Ownable {
+contract SightseaV3 is Ownable {
     address public protocolFeeDestination;
     uint256 public protocolFeePercent;
     uint256 public subjectFeePercent;
-
-    Point _point;
-
-    constructor() payable {
-        _point = new Point(0);
-    }
 
     event Trade(
         address trader,
@@ -40,8 +33,9 @@ contract SightseaV2 is Ownable {
     // Address => Keys of user
     mapping(address => address[]) internal _keysOfUser;
 
-    // Address => Point[]
-    mapping(address => Point[]) internal _pointsOfUser;
+    uint256 meritPointSupply = 0;
+    mapping(address => uint256) public meritPoint;
+    mapping(address => uint256) public gmeritPoint;
 
     function setFeeDestination(address _feeDestination) public onlyOwner {
         protocolFeeDestination = _feeDestination;
@@ -198,6 +192,15 @@ contract SightseaV2 is Ownable {
         return _keysOfUser[user];
     }
 
+    function getTotalKeyOfUser(address user) public view returns (uint256) {
+        uint256 total = 0;
+        for (uint256 i = 0; i < _keysOfUser[user].length; i++) {
+            total = total + sharesBalance[_keysOfUser[user][i]][user];
+        }
+
+        return total;
+    }
+
     function getTotalBalanceOfUser(address user) public view returns (uint256) {
         uint256 total = 0;
         for (uint256 i = 0; i < _keysOfUser[user].length; i++) {
@@ -223,27 +226,47 @@ contract SightseaV2 is Ownable {
         return keys;
     }
 
-    function mintTo(address to, uint256 amount) public {
-        _point.mint(to, amount);
+    function getTotalKeyInMarket() public view returns (uint256) {
+        uint256 total = 0;
+        for (uint256 i = 0; i < allSubjects.length; i++) {
+            total = total + sharesSupply[allSubjects[i]];
+        }
+        return total;
     }
 
-    function getPointBalance(address user) public view returns (uint256) {
-        return _point.balanceOf(user);
+    function setMeritPointSupply(uint256 amount) public onlyOwner {
+        meritPointSupply = amount;
     }
 
-    function getTotalSupply() public view returns (uint256) {
-        return _point.totalSupply();
+    function getMeritPointSupply() public view returns (uint256) {
+        return meritPointSupply;
     }
 
-    function tranferPoint(address from, address to, uint256 value) public {
-        _point.transferFrom(from, to, value);
+    function addMeritPoint(address user, uint256 amount) public onlyOwner {
+        meritPoint[user] = meritPoint[user] + amount;
     }
 
-    function burnPoint(address from, uint256 value) public {
-        _point.burnPoint(from, value);
+    function addGMeritPoint(address user, uint256 amount) public onlyOwner {
+        require(meritPointSupply >= amount, "Insufficient merit point supply");
+        meritPointSupply = meritPointSupply - amount;
+        gmeritPoint[user] = gmeritPoint[user] + amount;
     }
 
-    function getTotalPoint() public view returns (uint256) {
-        return _point.totalSupply();
+    function tranferMeritPoint(
+        address from,
+        address to,
+        uint256 amount
+    ) public {
+        require(gmeritPoint[from] >= amount, "Insufficient gmerit point");
+        gmeritPoint[from] = gmeritPoint[from] - amount;
+        meritPoint[to] = meritPoint[to] + amount;
+    }
+
+    function resetMeritPointSupply() public onlyOwner {
+        meritPointSupply = 0;
+    }
+
+    function resetGMeritPointOfUser(address user) public onlyOwner {
+        gmeritPoint[user] = 0;
     }
 }

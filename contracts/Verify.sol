@@ -90,9 +90,8 @@ abstract contract Ownable is Context {
 }
 
 // File: contracts/SightseaV1.sol
-pragma solidity >=0.8.2 <0.9.0;
 
-contract SightseaV1 is Ownable {
+contract SightseaV3 is Ownable {
     address public protocolFeeDestination;
     uint256 public protocolFeePercent;
     uint256 public subjectFeePercent;
