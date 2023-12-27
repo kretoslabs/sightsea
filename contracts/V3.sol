@@ -99,21 +99,23 @@ contract SightseaV1 is Ownable {
         return price - protocolFee - subjectFee;
     }
 
-    function buyShares(address sharesSubject, uint256 amount) public payable {
+    function buyShares(
+        address from,
+        address sharesSubject,
+        uint256 amount
+    ) public onlyOwner {
         uint256 supply = sharesSupply[sharesSubject];
         require(
-            supply > 0 || sharesSubject == msg.sender,
+            supply > 0 || sharesSubject == from,
             "Only the shares' subject can buy the first share"
         );
+
         uint256 price = getPrice(supply, amount);
         uint256 protocolFee = (price * protocolFeePercent) / 1 ether;
         uint256 subjectFee = (price * subjectFeePercent) / 1 ether;
-        require(
-            msg.value >= price + protocolFee + subjectFee,
-            "Insufficient payment"
-        );
-        sharesBalance[sharesSubject][msg.sender] =
-            sharesBalance[sharesSubject][msg.sender] +
+
+        sharesBalance[sharesSubject][from] =
+            sharesBalance[sharesSubject][from] +
             amount;
         sharesSupply[sharesSubject] = supply + amount;
 
@@ -124,17 +126,19 @@ contract SightseaV1 is Ownable {
         }
 
         bool hasKey = false;
-        for (uint256 i = 0; i < _keysOfUser[msg.sender].length; i++) {
-            if (_keysOfUser[msg.sender][i] == sharesSubject) {
+        for (uint256 i = 0; i < _keysOfUser[from].length; i++) {
+            if (_keysOfUser[from][i] == sharesSubject) {
                 hasKey = true;
                 break;
             }
         }
+
         if (!hasKey) {
-            _keysOfUser[msg.sender].push(sharesSubject);
+            _keysOfUser[from].push(sharesSubject);
         }
+
         emit Trade(
-            msg.sender,
+            from,
             sharesSubject,
             true,
             amount,
@@ -143,23 +147,26 @@ contract SightseaV1 is Ownable {
             subjectFee,
             supply + amount
         );
-        (bool success1, ) = protocolFeeDestination.call{value: protocolFee}("");
-        (bool success2, ) = sharesSubject.call{value: subjectFee}("");
-        require(success1 && success2, "Unable to send funds");
     }
 
-    function sellShares(address sharesSubject, uint256 amount) public payable {
+    function sellShares(
+        address from,
+        address sharesSubject,
+        uint256 amount
+    ) public onlyOwner {
         uint256 supply = sharesSupply[sharesSubject];
         require(supply > amount, "Cannot sell the last share");
+
         uint256 price = getPrice(supply - amount, amount);
         uint256 protocolFee = (price * protocolFeePercent) / 1 ether;
         uint256 subjectFee = (price * subjectFeePercent) / 1 ether;
+
         require(
-            sharesBalance[sharesSubject][msg.sender] >= amount,
+            sharesBalance[sharesSubject][from] >= amount,
             "Insufficient shares"
         );
-        sharesBalance[sharesSubject][msg.sender] =
-            sharesBalance[sharesSubject][msg.sender] -
+        sharesBalance[sharesSubject][from] =
+            sharesBalance[sharesSubject][from] -
             amount;
         sharesSupply[sharesSubject] = supply - amount;
 
@@ -169,7 +176,7 @@ contract SightseaV1 is Ownable {
         }
 
         emit Trade(
-            msg.sender,
+            from,
             sharesSubject,
             false,
             amount,
@@ -178,12 +185,6 @@ contract SightseaV1 is Ownable {
             subjectFee,
             supply - amount
         );
-        (bool success1, ) = msg.sender.call{
-            value: price - protocolFee - subjectFee
-        }("");
-        (bool success2, ) = protocolFeeDestination.call{value: protocolFee}("");
-        (bool success3, ) = sharesSubject.call{value: subjectFee}("");
-        require(success1 && success2 && success3, "Unable to send funds");
     }
 
     function getAllKeysOfUser(
